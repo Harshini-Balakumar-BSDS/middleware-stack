@@ -89,7 +89,6 @@ async def rate_limiter(request: Request, call_next):
 
 @app.get("/ping")
 async def ping(request: Request):
-
     return {
         "email": "23f3002183@ds.study.iitm.ac.in",
         "request_id": request.state.request_id
