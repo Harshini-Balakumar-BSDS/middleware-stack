@@ -1,48 +1,96 @@
-
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
 import time
+from collections import defaultdict
 
 app = FastAPI()
 
-# Change only these two values
-EMAIL = "23f3002183@ds.study.iitm.ac.in"
-ALLOWED_ORIGIN = "https://dash-0x8nwl.example.com"
+# ==========================================================
+# CORS
+# ==========================================================
 
-# ---------------- CORS ----------------
+ALLOWED_ORIGINS = [
+    "https://exam.sanand.workers.dev/tds-2026-05-ga2",
+    # Add the exam page origin here if needed
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[ALLOWED_ORIGIN],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------------- Middleware ----------------
+# ==========================================================
+# Rate Limiter
+# ==========================================================
+
+RATE_LIMIT = 10
+WINDOW = 10
+
+client_requests = defaultdict(list)
+
+# ==========================================================
+# Request Context Middleware
+# ==========================================================
+
 @app.middleware("http")
-async def add_headers(request: Request, call_next):
-    start_time = time.time()
+async def request_context(request: Request, call_next):
+
+    request_id = request.headers.get("X-Request-ID")
+
+    if request_id is None:
+        request_id = str(uuid.uuid4())
+
+    request.state.request_id = request_id
 
     response = await call_next(request)
 
-    process_time = time.time() - start_time
-
-    response.headers["X-Request-ID"] = str(uuid.uuid4())
-    response.headers["X-Process-Time"] = str(process_time)
+    response.headers["X-Request-ID"] = request_id
 
     return response
 
-# ---------------- Endpoint ----------------
-@app.get("/stats")
-def stats(values: str = Query(...)):
-    numbers = [int(x.strip()) for x in values.split(",")]
+# ==========================================================
+# Rate Limiter Middleware
+# ==========================================================
+
+@app.middleware("http")
+async def rate_limiter(request: Request, call_next):
+
+    client_id = request.headers.get("X-Client-Id", "anonymous")
+
+    now = time.time()
+
+    timestamps = client_requests[client_id]
+
+    timestamps[:] = [
+        t for t in timestamps
+        if now - t < WINDOW
+    ]
+
+    if len(timestamps) >= RATE_LIMIT:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded"}
+        )
+
+    timestamps.append(now)
+
+    response = await call_next(request)
+
+    return response
+
+# ==========================================================
+# Endpoint
+# ==========================================================
+
+@app.get("/ping")
+async def ping(request: Request):
 
     return {
-        "email": EMAIL,
-        "count": len(numbers),
-        "sum": sum(numbers),
-        "min": min(numbers),
-        "max": max(numbers),
-        "mean": sum(numbers) / len(numbers)
+        "email": "23f3002183@ds.study.iitm.ac.in",
+        "request_id": request.state.request_id
     }
