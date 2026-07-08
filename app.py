@@ -11,9 +11,11 @@ app = FastAPI()
 # CORS
 # ==========================================================
 
+from fastapi.middleware.cors import CORSMiddleware
+
 ALLOWED_ORIGINS = [
-    "https://exam.sanand.workers.dev/tds-2026-05-ga2",
-    # Add the exam page origin here if needed
+    "https://app-4sakdd.example.com",
+    "https://exam.sanand.workers.dev",
 ]
 
 app.add_middleware(
@@ -22,6 +24,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],   # <-- add this too
 )
 
 # ==========================================================
