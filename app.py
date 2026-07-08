@@ -94,3 +94,9 @@ async def ping(request: Request):
         "email": "23f3002183@ds.study.iitm.ac.in",
         "request_id": request.state.request_id
     }
+
+from fastapi import Response
+
+@app.options("/ping")
+async def options_ping():
+    return Response(status_code=200)
