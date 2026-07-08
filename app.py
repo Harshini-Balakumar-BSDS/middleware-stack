@@ -60,30 +60,30 @@ async def request_context(request: Request, call_next):
 @app.middleware("http")
 async def rate_limiter(request: Request, call_next):
 
-    # Allow CORS preflight requests without rate limiting
+    # Always allow preflight requests
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    client_id = request.headers.get("X-Client-Id", "anonymous")
+    client_id = request.headers.get("X-Client-Id")
+
+    # Don't rate-limit requests that don't provide a client ID
+    if client_id is None:
+        return await call_next(request)
 
     now = time.time()
 
     timestamps = client_requests[client_id]
-
     timestamps[:] = [t for t in timestamps if now - t < WINDOW]
 
     if len(timestamps) >= RATE_LIMIT:
         return JSONResponse(
             status_code=429,
-            content={"detail": "Rate limit exceeded"}
+            content={"detail": "Rate limit exceeded"},
         )
 
     timestamps.append(now)
 
-    response = await call_next(request)
-
-    return response
-
+    return await call_next(request)
 # ==========================================================
 # Endpoint
 # ==========================================================
