@@ -13,18 +13,16 @@ app = FastAPI()
 
 from fastapi.middleware.cors import CORSMiddleware
 
-ALLOWED_ORIGINS = [
-    "https://app-4sakdd.example.com",
-    "https://exam.sanand.workers.dev",
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=[
+        "https://app-4sakdd.example.com",
+        "https://exam.sanand.workers.dev",
+    ],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID"],   # <-- add this too
+    expose_headers=["X-Request-ID"],
 )
 
 # ==========================================================
@@ -59,9 +57,12 @@ async def request_context(request: Request, call_next):
 # ==========================================================
 # Rate Limiter Middleware
 # ==========================================================
-
 @app.middleware("http")
 async def rate_limiter(request: Request, call_next):
+
+    # Allow CORS preflight requests without rate limiting
+    if request.method == "OPTIONS":
+        return await call_next(request)
 
     client_id = request.headers.get("X-Client-Id", "anonymous")
 
@@ -69,10 +70,7 @@ async def rate_limiter(request: Request, call_next):
 
     timestamps = client_requests[client_id]
 
-    timestamps[:] = [
-        t for t in timestamps
-        if now - t < WINDOW
-    ]
+    timestamps[:] = [t for t in timestamps if now - t < WINDOW]
 
     if len(timestamps) >= RATE_LIMIT:
         return JSONResponse(
